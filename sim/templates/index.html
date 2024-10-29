@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inline Suggestion</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .suggestion-box {
+            transition: all 0.3s ease-in-out;
+        }
+
+        .suggestion-box.show {
+            opacity: 1;
+            transform: translateY(5px);
+        }
+
+        .suggestion-box.hide {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+    </style>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' class="h-full bg-gray-100">
+
+<div class="flex justify-center items-center h-screen">
+    <form id="container" tabindex="0" hx-trigger="input delay:200ms"
+            hx-post="/suggest"
+            hx-target="#suggestion"
+            class="flex flex-col items-start w-1/2">
+        <div class="relative w-full">
+            <div id="display" contenteditable="true"
+                    class="w-full p-4 text-gray-800 bg-white border border-gray-300 rounded-lg shadow-md focus:outline-none focus:ring-1 focus:ring-indigo-300 transition-all duration-300"
+                    autofocus
+                    oninput="syncInput(this.textContent); handleInput();">
+            </div>
+            <div id="suggestion"
+                class="suggestion-box absolute left-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-md p-4 max-w-full text-ellipsis cursor-pointer transition-all duration-300 hide">
+                <!-- This will be populated by HTMX -->
+            </div>
+        </div>
+        <input name="text" type="hidden" id="content" value="">
+    </form>
+</div>
+
+<script>
+    let lastInput = ''; // Store the last input
+    let suggestionTimeout;
+
+    const clearSuggestion = () => {
+        console.log("Clearing suggestion");
+        document.getElementById('suggestion').innerHTML = '';
+        toggleSuggestionVisibility();
+    };
+
+    const handleInput = () => {
+        const currentInput = document.getElementById('display').textContent;
+
+        if (currentInput !== lastInput) { // Only send request if input has changed
+            clearTimeout(suggestionTimeout); // Clear the existing timeout
+            clearSuggestion(); // Clear previous suggestion
+
+            // Set a timeout to trigger the HTMX request after a delay (e.g., 500ms)
+            suggestionTimeout = setTimeout(() => {
+                lastInput = currentInput; // Update last input
+                // Trigger the HTMX request
+                document.getElementById('container').dispatchEvent(new Event('input', { bubbles: true }));
+            }, 500); // Adjust delay as needed
+        }
+    };
+
+    const acceptSuggestion = (textContent) => {
+        console.log("Accepting suggestion: ", textContent);
+        document.getElementById('display').textContent += textContent;
+        syncInput(textContent);
+    };
+
+    const syncInput = (textContent) => {
+        document.getElementById('content').value = textContent;
+    };
+
+    const toggleSuggestionVisibility = () => {
+        const suggestionBox = document.getElementById('suggestion');
+        console.log("Current suggestion content:", suggestionBox.innerHTML);
+
+        if (suggestionBox.textContent.trim() === '') {
+            suggestionBox.classList.remove('show');
+            suggestionBox.classList.add('hide');
+        } else {
+            suggestionBox.classList.remove('hide');
+            suggestionBox.classList.add('show');
+        }
+    };
+
+    // Call toggleSuggestionVisibility after HTMX updates the suggestion box
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.target.id === 'suggestion') {
+            toggleSuggestionVisibility();
+        }
+    });
+</script>
+
+</body>
+</html>
